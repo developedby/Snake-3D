@@ -93,7 +93,7 @@ void main( void )
 //Configuracoes iniciais
 void Setup (void)
 {
-	char  i;
+	char i, j, k;
 	WDTCTL = WDTPW + WDTHOLD;       // Para timer do watchdog
 	//Configuracoes de P1 (dleds)
 	P1DIR |= 0xFF;             	    // Define P1 como saida
@@ -109,7 +109,7 @@ void Setup (void)
 	P2REN |= 0x38;//0b00111000;     // Ativa pullup/pulldown para entrada do teclado
 	
 	// Inicia o shift register de sel e espera seu tempo de inicializacao acabar
-	for (i=7; i<0; i--)				// Manda 7 uns para o shift reg (nivel definido pelo capacitor de Ativador Shift Reg)
+	for (i=7; i>0; i--)				// Manda 7 uns para o shift reg (nivel definido pelo capacitor de Ativador Shift Reg)
 	{
 		SetClkLed;
 		__delay_cycles(5);
@@ -121,8 +121,7 @@ void Setup (void)
 	ResetClkLed;
 	
 	//Limpa campo_de_jogo
-	char i, j, k;
-	//Limpa campo
+	
 	for(i=0;i<TAM_CAMPO;i++)
 	{
 		for(j=0;j<TAM_CAMPO;j++)
