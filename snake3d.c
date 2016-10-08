@@ -148,6 +148,14 @@ void Menu()
 {
 	char flag_comeco = 0;
 	char tecla_pressionada;
+	campo_de_jogo[0][0][0]= 1;
+	campo_de_jogo[0][0][1]= 0;
+	campo_de_jogo[0][1][0]= 1;
+	campo_de_jogo[0][1][1]= 0;
+	campo_de_jogo[0][2][0]= 0;
+	campo_de_jogo[0][2][1]= 1;
+	campo_de_jogo[0][3][0]= 0;
+	campo_de_jogo[0][3][1]= 1;
 	while (flag_comeco == 0)
 	{
 		tecla_pressionada = TecladoMatriz();
@@ -293,19 +301,19 @@ __interrupt void frame()
 		{
 			contador_frame = 0;
 			FrameJogo();
-			rng = (rng_x^(rng_x<<5));	//Muda o numero aleatorio para depender to tempo 
+			rng = (rng_x^(rng_x<<5));	//Muda o numero aleatorio para ele depender to tempo 
 			rng_x=rng_y;
 			rng_y=(rng_y^(rng_y>>1))^(rng^(rng>>3));
 		}
 }
 
-/*#pragma vector=PORT2_VECTOR            // Relaciona a funcao com o vetor de interrupcao da porta 1
+/*#pragma vector=PORT2_VECTOR          	// Relaciona a funcao com o vetor de interrupcao da porta 1
 __interrupt void teclado(void)
 {
-   P1OUT |= BIT0;                      // high
-   __delay_cycles(4000);               // Espera 4ms
-   P1OUT &= ~BIT0;                     // low
-   P1IFG &= ~BIT3;                     // P1.3 flag de interrupcao cleared
+   P1OUT |= BIT0;                      	// high
+   __delay_cycles(4000);               	// Espera 4ms
+   P1OUT &= ~BIT0;                     	// low
+   P1IFG &= ~BIT3;                     	// P1.3 flag de interrupcao cleared
 }*/
 
 //Seleciona qual grupo de dados vao ser colocados na saida
