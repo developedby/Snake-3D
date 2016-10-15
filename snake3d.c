@@ -101,7 +101,9 @@ void Setup (void)
 	P1OUT &= 0x00;                  // Poe 0 em todos os pinos de P1
 	
 	//Configuracoes de P2 (teclado, clk_led e som)
-	P2DIR =  0xC7;//0b11000111	    // Define 3 pinos do teclado(0,1,2) como saida e 3 pinos(3,4,5) como entrada; Define som e clk_led como saida (6 e 7)
+	P2DIR =  0xC7;//0b11000111	// Define 3 pinos do teclado(0,1,2) como saida e 3 pinos(3,4,5) como entrada; Define som e clk_led como saida (6 e 7)
+        P2SEL &= ~0xFF;                 // Define modo dos pinos (io)
+	P2SEL2 &= ~0xFF;
 	//P2IE |= BIT3;                 // Habilita interrupcao para p2.3
 	//P2IFG &= ~BIT3;               // Limpa flag de interrupcao
 	//P2IES |= BIT3;                // Determina que a interrupcao e por borda de descida
@@ -145,8 +147,19 @@ void Setup (void)
 
 void Menu()
 {
+        char i, j, k;
 	char flag_comeco = 0;
 	char tecla_pressionada;
+        for(i=0;i<TAM_CAMPO;i++)
+	{
+		for(j=0;j<TAM_CAMPO;j++)
+		{
+			for(k=0;k<TAM_CAMPO;k++)
+			{
+				campo_de_jogo[i][j][k]=1;
+			}
+		}
+	}
 	campo_de_jogo[0][0][0]= 1;
 	campo_de_jogo[0][0][1]= 0;
 	campo_de_jogo[0][1][0]= 1;
