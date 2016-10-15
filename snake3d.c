@@ -39,14 +39,13 @@
 */
 // Declaracao de Macros
 #define dleds P1OUT
-#define SetClkLed P2OUT|=0x40 //0b01000000
-#define ResetClkLed P2OUT&=0xBF //0b10111111
+//#define SetClkLed P2OUT|=BIT6; //0b01000000
+//#define ResetClkLed P2OUT&=~BIT6; //0b10111111
 
 #define TAM_CAMPO 4
 #define CAMPO_VAZIO 0
 #define CAMPO_COMIDA 64
 #define MAX_CONTADOR_FRAME_JOGO 250	//Numeros de frames graficos para 1 frame de gameplay (define a velocidade do jogo)
-#define CASA_NAO_VAZIA operador==CAMPO_CABECA||operador==CAMPO_COMIDA||operador==CAMPO_CORPO
 
 
 // Declaracao das funcoes
@@ -109,16 +108,17 @@ void Setup (void)
 	P2REN |= 0x38;//0b00111000;     // Ativa pullup/pulldown para entrada do teclado
 	
 	// Inicia o shift register de sel e espera seu tempo de inicializacao acabar
+        P2OUT&=~BIT6;
 	for (i=7; i>0; i--)				// Manda 7 uns para o shift reg (nivel definido pelo capacitor de Ativador Shift Reg)
 	{
-		SetClkLed;
+		P2OUT|=BIT6;//SetClkLed;
 		__delay_cycles(5);
-		ResetClkLed;
+		P2OUT&=~BIT6;//ResetClkLed;
 	}
 	__delay_cycles(2000000);		// Espera dois segundos para Ativador Shift Reg descarregar
-	SetClkLed;						// Manda o 0 do shift reg
+	P2OUT|=BIT6;//SetClkLed;                // Manda o 0 do shift reg
 	__delay_cycles(5);
-	ResetClkLed;
+	P2OUT&=~BIT6;//ResetClkLed;
 	
 	//Limpa campo_de_jogo
 	
@@ -292,9 +292,9 @@ __interrupt void frame()
 		sel_dados += 1;
 	Seleciona_dleds(sel_dados);
 	//MandaPulsoClkLed
-	SetClkLed;
+	P2OUT|=BIT6;//SetClkLed;
 	__delay_cycles(5);
-	ResetClkLed;
+	P2OUT&=~BIT6;//ResetClkLed;
 	if (flag_pause == 0)
 		if (++contador_frame == MAX_CONTADOR_FRAME_JOGO)
 		{
