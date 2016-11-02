@@ -61,13 +61,8 @@
 	8 - Start
 */
 // Declaracao de Macros
-#define pin_kb_in_0 BIT0
-#define pin_kb_in_1 BIT1
-#define pin_kb_in_2 BIT2
-#define pin_kb_out_0 BIT3
-#define pin_kb_out_1 BIT4
-#define pin_kb_out_2 BIT5
 
+//Define botoes do teclado e direcoes
 #define esquerda 0
 #define direita 5
 #define frente 3
@@ -78,6 +73,15 @@
 #define menos 7
 #define start 8
  
+//Define pinos da porta 1 (teclado)
+#define pin_kb_in_0 BIT0
+#define pin_kb_in_1 BIT1
+#define pin_kb_in_2 BIT2
+#define pin_kb_out_0 BIT3
+#define pin_kb_out_1 BIT4
+#define pin_kb_out_2 BIT5
+
+//Define pinos da porta 2
 #define pin_dleds BIT0
 #define pin_clk_dleds BIT1
 #define pin_sel BIT3
@@ -85,10 +89,18 @@
 #define pin_som BIT6
 #define pin_ativador_som BIT7
 
+//Define valor de campo_de_jogo
 #define TAM_CAMPO 4
 #define CAMPO_VAZIO 0
 #define CAMPO_COMIDA 64
+
+//Define frame de gameplay
 #define MAX_CONTADOR_FRAME_JOGO 250	//Numeros de frames graficos para 1 frame de gameplay (define a velocidade do jogo)
+
+//Define os modos de jogo
+#define PAREDE_MATA 1
+#define PAREDE_ATRAVESSA 2
+#define PAREDE_ENCOLHE 3
 
 
 // Declaracao das funcoes
@@ -107,6 +119,8 @@ char TecladoMatriz(void);
 void GeraComida(void);
 char ChecaEntradasTeclado(void);
 void MudaModoDeJogo(char mudanca);
+void EscreveCaracter(char caracter, char layer);
+void EscreveModoDeJogo(char layer);
 
 // Declaracao de variaveis
 int contador_frame = 0;
@@ -140,7 +154,10 @@ void Setup (void)
 {
 	char i, j, k;
 	WDTCTL = WDTPW + WDTHOLD;       // Para timer do watchdog
-        
+       
+	//Define o modo_de_jogo inicial
+	modo_de_jogo = PAREDE_MATA;
+	   
 	//Configuracoes de P1 (teclado)
 	
 	// Define modo dos pinos (io)
@@ -192,22 +209,30 @@ void Setup (void)
 	__enable_interrupt();		  //Habilita intererupcoes 
 }
 
+
+//Mostra o menu e aguarda instrucoes (mudar modo de jogo ou comecar)
 void Menu()
 {
-        char i, j, k;
+    char i, j, k;
 	char flag_comeco = 0;
 	char tecla_pressionada;
-        for(i=0;i<TAM_CAMPO;i++)
+	
+	//Limpa o campo
+    for(i=0;i<TAM_CAMPO;i++)
 	{
 		for(j=0;j<TAM_CAMPO;j++)
 		{
 			for(k=0;k<TAM_CAMPO;k++)
 			{
-				campo_de_jogo[i][j][k]=1;
+				campo_de_jogo[i][j][k]=CAMPO_VAZIO;
 			}
 		}
 	}
-
+	
+	//Escreve modo de jogo inicial no andar 0;
+	EscreveModoDeJogo(0);
+	
+	//Espera um botao
 	while (flag_comeco == 0)
 	{
 		tecla_pressionada = TecladoMatriz();
@@ -225,6 +250,7 @@ void Menu()
 		}
 	}
 }
+//Aumenta ou diminui o modo de jogo de forma ciclica, dependendo do sinal do parametro
 void MudaModoDeJogo(char mudanca)
 {
 	if(mudanca>0)
@@ -239,6 +265,62 @@ void MudaModoDeJogo(char mudanca)
 			modo_de_jogo=2;
 	
 }
+
+//Escreve um caracter em campo_de_jogo, dado que o mesmo esteja limpo
+void EscreveCaracter(char caracter, char layer)
+{
+	switch(caracter)
+	{
+		case '1':
+			campo_de_jogo[layer][0][0] = 1;		//  O O . .
+			campo_de_jogo[layer][0][1] = 1;		//	. O . .
+			campo_de_jogo[layer][1][1] = 1;		//	. O . .
+			campo_de_jogo[layer][2][1] = 1;		//	O O O .
+			campo_de_jogo[layer][3][0] = 1;
+			campo_de_jogo[layer][3][1] = 1;
+			campo_de_jogo[layer][3][2] = 1;
+			break;
+		case '2':
+			campo_de_jogo[layer][0][0] = 1;		//  O O . .
+			campo_de_jogo[layer][0][1] = 1;		//	. . O .
+			campo_de_jogo[layer][1][2] = 1;		//	. O . .
+			campo_de_jogo[layer][2][1] = 1;		//	O O O .
+			campo_de_jogo[layer][3][0] = 1;
+			campo_de_jogo[layer][3][1] = 1;
+			campo_de_jogo[layer][3][2] = 1;
+			break;
+		case '3':
+			campo_de_jogo[layer][0][0] = 1;		//  O O O .
+			campo_de_jogo[layer][0][1] = 1;		//	. O O .
+			campo_de_jogo[layer][0][2] = 1;		//	. . O .
+			campo_de_jogo[layer][1][1] = 1;		//	O O O .
+			campo_de_jogo[layer][1][2] = 1;
+			campo_de_jogo[layer][2][3] = 1;
+			campo_de_jogo[layer][3][0] = 1;
+			campo_de_jogo[layer][3][1] = 1;
+			campo_de_jogo[layer][3][2] = 1;
+			break;
+	}
+}
+
+//Escreve o numero correspondente ao modo_de_jogo no andar layer de campo_de_jogo
+void EscreveModoDeJogo(char layer)
+{
+	switch(modo_de_jogo)
+	{
+		case PAREDE_MATA:
+			EscreveCaracter('1',layer);
+			break;
+		case PAREDE_ATRAVESSA:
+			EscreveCaracter('2',layer);
+			break;
+		case PAREDE_ENCOLHE:
+			EscreveCaracter('3',layer);
+			break;
+	}
+}
+//Funcao contendo a parte jogavel
+//A cada frame de gameplay anda um quadrado na direcao do ultimo botao apertado
 void Jogo()
 {
 	char i,j,k;
@@ -348,20 +430,28 @@ void GeraComida()
 // Operacoes a serem executadas a cada frame grafico
 __interrupt void frame()
 {
+	//Acende o proximo grupo de leds
 	if(sel_dados == 7)
 		sel_dados = 0;
 	else
 		sel_dados += 1;
 	Seleciona_dleds(sel_dados);
+	
 	//MandaPulsoClkLed
 	P2OUT|=BIT6;//SetClkLed;
 	__delay_cycles(5);
 	P2OUT&=~BIT6;//ResetClkLed;
+	
+	//Se estiver jogando
 	if (flag_pause == 0)
+		//Incrementa o contador de frames e, se chegar a um frame de gameplay
 		if (++contador_frame == MAX_CONTADOR_FRAME_JOGO)
 		{
+			//Reseta o contador de frames
 			contador_frame = 0;
+			//Executa um frame de gameplay
 			FrameJogo();
+			//Atualiza o numero aleatorio
 			rng = (rng_x^(rng_x<<5));	//Muda o numero aleatorio para ele depender to tempo 
 			rng_x=rng_y;
 			rng_y=(rng_y^(rng_y>>1))^(rng^(rng>>3));
@@ -416,6 +506,7 @@ void Printa_dleds(char m, char n)
 	dleds[5] = campo_de_jogo[m][2][n+1] ? 1 : 0;
 	dleds[6] = campo_de_jogo[m][3][n] ? 1 : 0;
 	dleds[7] = campo_de_jogo[m][3][n+1] ? 1 : 0;
+	
 	//Manda as informacoes para pin_dleds
 	P2OUT &= ~pin_clk_dleds;
 	for (i=0; i<8; i++)
@@ -445,7 +536,19 @@ void FrameJogo(void)
 //Operacoes a serem executadas quando o jogador bater na parede
 void BateParede()
 {
-	flag_jogo = 0;
+	switch(modo_de_jogo)
+	{
+		//Se modo de jogo e 1 (Parede mata), acaba o jogo
+		case PAREDE_MATA:
+			flag_jogo = 0;
+			break;
+		//Se modo de jogo e 2 (Parede atravessa), aparece com a cabeca do outro lado
+		case PAREDE_ATRAVESSA:
+			break;
+		//Se modo de jogo e 3 (Parede encolhe), diminui em 1 o tamanhoda cobra sem se mover
+		case PAREDE_ENCOLHE:
+			break;
+	}
 }
 	
 //Cobra come um bloco (anda so a cabeca)
