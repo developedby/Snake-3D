@@ -13,6 +13,8 @@
 	P2.1        clk_dleds
 	P2.3:		sel
 	P2.4:		clk_sel
+	P2.6(XIN):  ativador_som
+	P2.7(XOUT): som
 */
 /*
 	Ordenacao do cubo de leds:					|	Eixo x = esquerda/direita
@@ -81,6 +83,7 @@
 #define pin_sel BIT3
 #define pin_clk_sel BIT4
 #define pin_som BIT6
+#define pin_ativador_som BIT7
 
 #define TAM_CAMPO 4
 #define CAMPO_VAZIO 0
@@ -175,6 +178,10 @@ void Setup (void)
 		}
 	}
 	
+	//Prepara o som
+	P2OUT |= pin_ativador_som;
+	P2OUT &= ~(pin_ativador_som);
+	P2OUT |= pin_ativador_som;
 	
 	//Configuracoes TIMER0_A
 	TA0CTL |= 	TASSEL_2		  //Seleciona SMCLK como counter (1MHz)
