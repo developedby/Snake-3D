@@ -1,29 +1,26 @@
 //------------------ Snake 3d ----------------//
-//             	  Projetado por:	      	  //
-//	  		Nicolas Abril e Caio Kakuno	  	  //
+//				  Projetado por:			  //
+//			Nicolas Abril e Caio Kakuno		  //
 //--------------------------------------------//
 
 
 #include "msp430g2553.h"
 
 /* 	Instrucoes de uso das portas:
-	P1.[0..2]: 	teclado input
-	P1.[3..5]:	teclado output
-	P2.0        dleds
-	P2.1        clk_dleds
-	P2.3:		sel
-	P2.4:		clk_sel
-	P2.6(XIN):  ativador_som
-	P2.7(XOUT): som
+	P1: 		dleds
+	P2.[0..2]: 	saida teclado matriz
+	P2.[3..5]: 	entrada teclado matriz
+	P2.6:		ClkLed
+	P2.7:		Som
 */
 /*
-	Ordenacao do cubo de leds:					|	Eixo x = esquerda/direita
-	Cada grupo tem 8 leds ou 2 linhas de 4 leds	|	Eixo y = cima/baixo
-	Leitura dos grupos:							|	
-	Com os cabos virados para si				|	0	1
-	1 esquerda -> direita				        |	2	3
-	2 cima -> baixo								|	4	5
-												|	6	7
+	Ordenacao do cubo de leds:						|	Eixo x = esquerda/direita
+	Cada grupo tem 8 leds ou 2 linhas de 4 leds		|	Eixo y = cima/baixo
+	Leitura dos grupos:								|	
+	Com os cabos virados para si					|	0	1
+	1 esquerda -> direita							|	2	3
+	2 cima -> baixo									|	4	5
+													|	6	7
 */
 /*
 	Leitura de um andar de leds (visto de cima)
@@ -40,50 +37,10 @@
 	[2][0]
 	[3][0]		
 */
-/*
-	Leitura do teclado
-	.	1	2
-	0	.	5
-	3	4	.
-	.	.	.
-	6	7	8
-	
-	. indica espaco sem botao
-	
-	0 - Esquerda
-	1 - Cima
-	2 - Tras
-	3 - Frente
-	4 - Baixo
-	5 - Direita
-	6 - +
-	7 - -
-	8 - Start
-*/
 // Declaracao de Macros
-#define pin_kb_in_0 BIT0
-#define pin_kb_in_1 BIT1
-#define pin_kb_in_2 BIT2
-#define pin_kb_out_0 BIT3
-#define pin_kb_out_1 BIT4
-#define pin_kb_out_2 BIT5
-
-#define esquerda 0
-#define direita 5
-#define frente 3
-#define tras 2
-#define cima 1
-#define baixo 4
-#define mais 6
-#define menos 7
-#define start 8
- 
-#define pin_dleds BIT0
-#define pin_clk_dleds BIT1
-#define pin_sel BIT3
-#define pin_clk_sel BIT4
-#define pin_som BIT6
-#define pin_ativador_som BIT7
+#define dleds P1OUT
+//#define SetClkLed P2OUT|=BIT6; //0b01000000
+//#define ResetClkLed P2OUT&=~BIT6; //0b10111111
 
 #define TAM_CAMPO 4
 #define CAMPO_VAZIO 0
@@ -95,6 +52,7 @@
 void Setup (void);
 #pragma vector=TIMER0_A1_VECTOR
 __interrupt void frame();
+//__interrupt void teclado();
 void Seleciona_dleds(char sel_dados);
 void Printa_dleds(char m, char n);
 void FrameJogo(void);
@@ -105,24 +63,20 @@ void AndaECome(void);
 void BateParede(void);
 char TecladoMatriz(void);
 void GeraComida(void);
-char ChecaEntradasTeclado(void);
-void MudaModoDeJogo(char mudanca);
+
 
 // Declaracao de variaveis
 int contador_frame = 0;
 char campo_de_jogo[TAM_CAMPO][TAM_CAMPO][TAM_CAMPO];
 char sel_dados = 0;						  //Numero do grupo de dados do campo [0..7], ordenados vide comentario acima
-char dleds[8];                            //Vetor contendo os dados para serem enviados para os leds
 char pos_cabeca[3];						  //Coordenada cabeca (x,y,z)
 char pos_comida[3];						  //Coordenada comida (x,y,z)
 char dv[3];						  		  //Vetor velocidade (x,y,z)
 char tam_cobra;						      //Tamanho atual da cobra	  
 char modo_de_jogo;						  //0: Parede = morte		|1: Parede = da a volta		|2: Parede = absorve cabeca
-char flag_jogo = 0;						  //Indica se esta no meio de um jogo 
-char flag_pause = 0;					  //Indica se o jogo esta pausado
-unsigned int rng, rng_x=1, rng_y=1;		  //Variaveis para geracao de numeros aleatorios
-
-
+char flag_jogo = 0;
+char flag_pause = 0;
+unsigned int rng, rng_x=1, rng_y=1;
 // -----------------Algoritmos------------------ //
 
 void main( void )
@@ -140,33 +94,38 @@ void Setup (void)
 {
 	char i, j, k;
 	WDTCTL = WDTPW + WDTHOLD;       // Para timer do watchdog
-        
-	//Configuracoes de P1 (teclado)
+	//Configuracoes de P1 (dleds)
+	P1DIR |= 0xFF;             	    // Define P1 como saida
+	P1SEL &= ~0xFF;                 // Define modo dos pinos (io)
+	P1SEL2 &= ~0xFF;                // Idem
+	P1OUT &= 0x00;                  // Poe 0 em todos os pinos de P1
 	
-	// Define modo dos pinos (io)
-    P1SEL &= ~0xFF;
-	P1SEL2 &= ~0xFF;           
-	
-	// Define quais pinos sao entrada e quaius sao saida
-	P1DIR &= ~(pin_kb_in_0 + pin_kb_in_1 + pin_kb_in_2); 
-	P1DIR |= pin_kb_out_0 + pin_kb_out_1 + pin_kb_out_2;
-	
-	// Ativa pullup/pulldown para entrada do teclado
-    P1REN |= pin_kb_in_0 + pin_kb_in_1 + pin_kb_in_2;
-	
-	// Define dados de saida e pullup/down de entrada 
-	P1OUT &= ~(pin_kb_in_0 + pin_kb_in_1 + pin_kb_in_2);   //Pullup nas entradas
-	P1OUT &= ~(pin_kb_out_0 + pin_kb_out_1 + pin_kb_out_2) //Inicia com 0
-	
-	//Configuracoes de P2 (leds e som)
-    P2SEL &= ~0xFF;                 // Define modo dos pinos (io)
+	//Configuracoes de P2 (teclado, clk_led e som)
+	P2DIR =  0xC7;//0b11000111	// Define 3 pinos do teclado(0,1,2) como saida e 3 pinos(3,4,5) como entrada; Define som e clk_led como saida (6 e 7)
+        P2SEL &= ~0xFF;                 // Define modo dos pinos (io)
 	P2SEL2 &= ~0xFF;
+	//P2IE |= BIT3;                 // Habilita interrupcao para p2.3
+	//P2IFG &= ~BIT3;               // Limpa flag de interrupcao
+	//P2IES |= BIT3;                // Determina que a interrupcao e por borda de descida
+	P2REN |= 0x38;//0b00111000;     // Ativa pullup/pulldown para entrada do teclado
 	
-	P2DIR =  0xFF;          	    // Define todos os pinos de p2 como saida
-    P2OUT = 0x00;					// Inicia as saidas com 0
-	
+	// Inicia o shift register de sel e espera seu tempo de inicializacao acabar
+        P2OUT&=~BIT6;
+		P2OUT|=BIT6;//SetClkLed;                // Manda o 0 do shift reg
+		__delay_cycles(5);
+		P2OUT&=~BIT6;//ResetClkLed;
+		__delay_cycles(2000000);	// Espera dois segundos para Ativador Shift Reg carregar
+	for (i=7; i>0; i--)				// Preenche os espacos vazios com 1
+	{
+		P2OUT|=BIT6;//SetClkLed;
+		__delay_cycles(5);
+		P2OUT&=~BIT6;//ResetClkLed;
+	}
+
+
 	
 	//Limpa campo_de_jogo
+	
 	for(i=0;i<TAM_CAMPO;i++)
 	{
 		for(j=0;j<TAM_CAMPO;j++)
@@ -178,10 +137,6 @@ void Setup (void)
 		}
 	}
 	
-	//Prepara o som
-	P2OUT |= pin_ativador_som;
-	P2OUT &= ~(pin_ativador_som);
-	P2OUT |= pin_ativador_som;
 	
 	//Configuracoes TIMER0_A
 	TA0CTL |= 	TASSEL_2		  //Seleciona SMCLK como counter (1MHz)
@@ -207,38 +162,35 @@ void Menu()
 			}
 		}
 	}
-
+	campo_de_jogo[0][0][0]= 1;
+	campo_de_jogo[0][0][1]= 0;
+	campo_de_jogo[0][1][0]= 1;
+	campo_de_jogo[0][1][1]= 0;
+	campo_de_jogo[0][2][0]= 0;
+	campo_de_jogo[0][2][1]= 1;
+	campo_de_jogo[0][3][0]= 0;
+	campo_de_jogo[0][3][1]= 1;
 	while (flag_comeco == 0)
 	{
 		tecla_pressionada = TecladoMatriz();
 		switch (tecla_pressionada)
 		{
-			case start:
+			case 8:
 				flag_comeco = 1;
 				break;
-			case mais:
-				MudaModoDeJogo(1);
+			case 0:
+				modo_de_jogo = 0;
 				break;
-			case menos:
-				MudaModoDeJogo(-1);
+			case 1:
+				modo_de_jogo = 1;
+				break;
+			case 2:
+				modo_de_jogo = 2;
 				break;
 		}
 	}
 }
-void MudaModoDeJogo(char mudanca)
-{
-	if(mudanca>0)
-		if(modo_de_jogo<2)
-			modo_de_jogo++;
-		else
-			modo_de_jogo=0;
-	else if(mudanca<0)
-		if(modo_de_jogo>0)
-			modo_de_jogo--;
-		else
-			modo_de_jogo=2;
-	
-}
+
 void Jogo()
 {
 	char i,j,k;
@@ -273,37 +225,37 @@ void Jogo()
 		{
 			switch (tecla_pressionada)
 			{
-				case esquerda:
+				case 0:	//Esquerda
 					dv[0] = -1;
 					dv[1] = 0;
 					dv[2] = 0;
 					break;
-				case cima:
+				case 1:	//Cima
 					dv[0] = 0;
 					dv[1] = -1;
 					dv[2] = 0;
 					break;
-				case tras:
+				case 2:	//Tras
 					dv[0] = 0;
 					dv[1] = 0;
 					dv[2] = -1;
 					break;
-				case direita
+				case 3:	//Direita
 					dv[0] = 1;
 					dv[1] = 0;
 					dv[2] = 0;
 					break;
-				case baixo:
+				case 4:	//Baixo
 					dv[0] = 0;
 					dv[1] = 1;
 					dv[2] = 0;
 					break;
-				case frente
+				case 5:	//Frente
 					dv[0] = 0;
 					dv[1] = 0;
 					dv[2] = 1;
 					break;
-				case start:
+				case 8:
 					flag_pause = 1;
 					__delay_cycles(500000);
 					break;
@@ -324,6 +276,7 @@ void Jogo()
 //Geracao aleatoria de comida
 void GeraComida()
 {
+	
 	char flag_comida=0;
 	while(flag_comida==0)
 	{
@@ -344,8 +297,8 @@ void GeraComida()
 //**********************************************************//
 //Funcoes a serem executadas por interrupcoes
 
-
 // Operacoes a serem executadas a cada frame grafico
+
 __interrupt void frame()
 {
 	if(sel_dados == 7)
@@ -368,10 +321,20 @@ __interrupt void frame()
 		}
 }
 
+/*#pragma vector=PORT2_VECTOR          	// Relaciona a funcao com o vetor de interrupcao da porta 1
+__interrupt void teclado(void)
+{
+   P1OUT |= BIT0;                      	// high
+   __delay_cycles(4000);               	// Espera 4ms
+   P1OUT &= ~BIT0;                     	// low
+   P1IFG &= ~BIT3;                     	// P1.3 flag de interrupcao cleared
+}*/
+
 //Seleciona qual grupo de dados vao ser colocados na saida
 //sel_dados = numero do grupo de dados/leds
 void Seleciona_dleds(char sel_dados)
 {
+	P1OUT = 0;
 	switch (sel_dados)
 	{
 		case 0:
@@ -406,26 +369,22 @@ void Seleciona_dleds(char sel_dados)
 //n = coluna inicial
 void Printa_dleds(char m, char n)
 {
-	int i;
-	//Define quais leds vao acender
-	dleds[0] = campo_de_jogo[m][0][n] ? 1 : 0;
-	dleds[1] = campo_de_jogo[m][0][n+1] ? 1 : 0;
-	dleds[2] = campo_de_jogo[m][1][n] ? 1 : 0;
-	dleds[3] = campo_de_jogo[m][1][n+1] ? 1 : 0;
-	dleds[4] = campo_de_jogo[m][2][n] ? 1 : 0;
-	dleds[5] = campo_de_jogo[m][2][n+1] ? 1 : 0;
-	dleds[6] = campo_de_jogo[m][3][n] ? 1 : 0;
-	dleds[7] = campo_de_jogo[m][3][n+1] ? 1 : 0;
-	//Manda as informacoes para pin_dleds
-	P2OUT &= ~pin_clk_dleds;
-	for (i=0; i<8; i++)
-	{
-	  P2OUT &= ~pin_dleds;
-	  if (dleds[i])
-		P2OUT |= pin_dleds;
-	  P2OUT |= pin_clk_dleds;
-	  P2OUT &= ~pin_clk_dleds;
-	}   
+	if(campo_de_jogo[m][0][n] > 0)
+		P1OUT |= 0x01;//0b00000001;
+	if(campo_de_jogo[m][0][n+1] > 0)
+		P1OUT |= 0x02;//0b00000010;
+	if(campo_de_jogo[m][1][n] > 0)
+		P1OUT |= 0x04;//0b00000100;
+	if(campo_de_jogo[m][1][n+1] > 0)
+		P1OUT |= 0x08;//0b00001000;
+	if(campo_de_jogo[m][2][n] > 0)
+		P1OUT |= 0x10;//0b00010000;
+	if(campo_de_jogo[m][2][n+1] > 0)
+		P1OUT |= 0x20;//0b00100000;
+	if(campo_de_jogo[m][3][n] > 0)
+		P1OUT |= 0x40;//0b01000000;
+	if(campo_de_jogo[m][3][n+1] > 0)
+		P1OUT |= 0x80;//0b10000000;
 }
 
 //Operacoes a serem executadas a cada frame de gameplay (1 frame de gameplay = MAX_CONTADOR_FRAME_JOGO frames graficos)
@@ -478,34 +437,68 @@ void Anda()
 //**************************************************************//
 // Funcoes de teclado
 // Retorna qual botao esta sendo apertado no teclado em matriz
-char TecladoMatriz(void) 
+char TecladoMatriz(void)
 {
-	//Limpa a saida do teclado
-	P1OUT &= ~(pin_kb_out_0 + pin_kb_out_1 + pin_kb_out_2);
-	
-	//Busca na fileira 0
-	P1OUT |= pin_kb_out_0;
-	if(ChecaEntradasTeclado()>0)
-		return ChecaEntradasTeclado;
-	P1OUT &= ~pin_kb_out_0;
-	P1OUT |= pin_kb_in_1;
-	if(ChecaEntradasTeclado()>0)
-		return ChecaEntradasTeclado + 3;
-	P1OUT &= ~pin_kb_out_1;
-	P1OUT |= pin_kb_in_2;
-	if(ChecaEntradasTeclado()>0)
-		return ChecaEntradasTeclado + 6;
-	P1OUT &= ~pin_kb_out_2;
-	return -1;
-}
-//Verifica se um botao da fileira sendo checada esta apertado
-char ChecaEntradasTeclado()
-{
-	if(P1OUT & pin_kb_in_0)
+	//Procura na primeira fileira
+	P2OUT |= 0x01;//0b00000001;
+	__delay_cycles(10);
+	if(P2OUT&0x08)//0b00001000)
+	{
+		P2OUT &= 0xFE;//0b11111110;
 		return 0;
-	if(P1OUT & pin_kb_in_1)
+	}
+	else if(P2OUT&0x10)//0b00010000)
+	{
+		P2OUT &= 0xFE;//0b11111110;
 		return 1;
-	if(P1OUT & pin_kb_in_2)
+	}	
+	else if(P2OUT&0x20)//0b00100000)
+	{
+		P2OUT &= 0xFE;//0b11111110;
 		return 2;
+	}
+	P2OUT &= 0xFE;//0b11111110;
+	
+	//Procura na segunda fileira
+	P2OUT |= 0x02;//0b00000010;
+	__delay_cycles(10);
+	if(P2OUT&0x08)//0b00001000)
+	{
+		P2OUT &= 0xFD;//0b11111101;
+		return 3;
+	}
+	else if(P2OUT&0x10)//0b00010000)
+	{
+		P2OUT &= 0xFD;//0b11111101;
+		return 4;
+	}
+	else if(P2OUT&0x20)//0b00100000)
+	{
+		P2OUT &= 0xFD;//0b11111101;
+		return 5;
+	}
+	P2OUT &= 0xFD;//0b11111101;
+	
+	//Procura na terceira fileira
+	P2OUT |= 0x04;//0b00000100;
+	__delay_cycles(10);
+	if(P2OUT&0x08)//0b00001000)
+	{
+		P2OUT &= 0xFB;//0b11111011;
+		return 6;
+	}
+	else if(P2OUT&0x10)//0b00010000)
+	{
+		P2OUT &= 0xFB;//0b11111011;
+		return 7;
+	}
+	else if(P2OUT&0x20)//0b00100000)
+	{
+		P2OUT &= 0xFB;//0b11111011;
+		return 8;
+	}
+	P2OUT &= 0xFB;//0b11111011;
+	
+	//Se nenhum botao foi pressionado
 	return -1;
 }
